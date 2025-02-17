@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Boltu Shooter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            touch-action: none;
+        }
+
+        body {
+            background: url('background.jpg') no-repeat center center fixed;
+            background-size: cover;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+        }
+
+        .mujib {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #gun {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            z-index: 999;
+            transition: transform 0.1s ease;
+        }
+
+        .gun-shake {
+            animation: shake 0.1s ease-in-out;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            25% { transform: translateX(-50%) rotate(-5deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+            75% { transform: translateX(-50%) rotate(-5deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
+        }
+
+        #fireEffect {
+            position: fixed;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 25px;
+            height: 25px;
+            background: url('fire.png') no-repeat center;
+            background-size: contain;
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+        }
+
+        #score-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            font-family: Arial;
+            text-shadow: 2px 2px 4px black;
+        }
+
+        #missed {
+            font-size: 20px;
+            color: red;
+            margin-top: 10px;
+        }
+
+        #gameOver {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        #startScreen {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #startScreen button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="startScreen">
+        <h2>Welcome to <br><p style="color: red;">BOLTU SHOOTER</p></h2>
+        <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="gameContainer">
+        <div id="score-container">
+            <div id="score">Score: 0</div>
+            <div id="missed">Missed: 0/3</div>
+        </div>
+        <img id="gun" src="gun.png" alt="Gun">
+        <div id="fireEffect"></div>
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        let missed = 0;
+        let isGameActive = false;
+        const shootSound = new Audio('shoot.mp3');
+        const gameOverSound = new Audio('gameover.mp3');
+        const killSound = new Audio('kill.mp3');
+        const mouthSound = new Audio('mouth.mp3');
+        let mujibMissed = 0;  // Track missed mujibs
+
+        let mujibSpeed = 5;  // Initial speed of Mujib
+
+        function createMujib() {
+            if (!isGameActive) return;
+
+            const mujib = document.createElement('img');
+            mujib.src = 'mujib.jpg';
+            mujib.className = 'mujib';
+
+            const startX = Math.random() * (window.innerWidth - 80);
+            mujib.style.left = startX + 'px';
+            mujib.style.bottom = '-100px';
+
+            document.getElementById('gameContainer').appendChild(mujib);
+
+            let position = -100;
+            let speed = mujibSpeed;
+            let direction = 1;
+
+            function animate() {
+                if (!isGameActive) {
+                    mujib.remove();
+                    return;
+                }
+
+                if (direction === 1) {
+                    position += speed;
+                    if (position >= window.innerHeight / 2) direction = -1;
+                } else {
+                    position -= speed;
+                    if (position <= 0) {
+                        if (!mujib.clicked) {  // Check if not clicked before counting as missed
+                            mujibMissed++;
+                            updateMissed();
+                        }
+                        mujib.remove();
+                        return;
+                    }
+                }
+
+                mujib.style.bottom = position + 'px';
+                requestAnimationFrame(animate);
+            }
+
+            requestAnimationFrame(animate);
+
+            mujib.onclick = () => {
+                if (!mujib.clicked) {  // Prevent double counting
+                    mujib.clicked = true;
+                    score += 50;
+                    document.getElementById('score').textContent = `Score: ${score}`;
+                    shootSound.play();
+                    killSound.play();
+                    mouthSound.play(); // Play mouth sound when Mujib is shot
+                    gunFireEffect();
+                    mujib.remove();
+                    checkDifficulty(); // Check if difficulty should increase
+                }
+            }
+        }
+
+        function gunFireEffect() {
+            const gun = document.getElementById('gun');
+            const fire = document.getElementById('fireEffect');
+
+            gun.classList.add('gun-shake');
+            setTimeout(() => {
+                gun.classList.remove('gun-shake');
+            }, 100);
+
+            fire.style.opacity = '1';
+            setTimeout(() => {
+                fire.style.opacity = '0';
+            }, 150);
+        }
+
+        function updateMissed() {
+            document.getElementById('missed').textContent = `Missed: ${mujibMissed}/3`;
+            if (mujibMissed >= 3) {
+                gameOver();
+            }
+        }
+
+        function checkDifficulty() {
+            if (score >= 500 && mujibSpeed < 8) {
+                mujibSpeed += 1; // Increase speed after 1500 score
+            }
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            gameOverSound.play();
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('finalScore').textContent = score;
+        }
+
+        function restartGame() {
+            score = 0;
+            mujibMissed = 0;
+            isGameActive = true;
+            mujibSpeed = 5;  // Reset speed
+            document.getElementById('score').textContent = `Score: 0`;
+            document.getElementById('missed').textContent = `Missed: 0/3`;
+            document.getElementById('gameOver').style.display = 'none';
+            startGame();
+        }
+
+        function startGame() {
+            isGameActive = true;
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+            setInterval(createMujib, 2000);
+        }
+    </script>
+
+</body>
+</html>  </script>
+
+</body>
+</html>  </script>
+
+</body>
+</html>
